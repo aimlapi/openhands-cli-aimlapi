@@ -115,6 +115,51 @@ SettingsScreen {
     min-width: 12;
 }
 
+/* AIMLAPI key row: [ API key field ] or [ Get API key ] */
+#api_key_row {
+    layout: horizontal;
+    width: 100%;
+    height: auto;
+    align: left top;
+}
+
+#api_key_field_col {
+    width: 1fr;
+    height: auto;
+}
+
+#aimlapi_or {
+    width: auto;
+    height: 3;
+    padding: 0 2;
+    content-align: center middle;
+    color: $secondary;
+    text-style: italic bold;
+}
+
+#aimlapi_get_key_group {
+    width: 1fr;
+    height: auto;
+}
+
+#aimlapi_get_key_button {
+    width: 100%;
+    /* Match the key field's margin-bottom (.form_input) so the helper text
+       under the button lines up with "Have a key? Paste it here." */
+    margin-bottom: 1;
+}
+
+/* Green confirmation after the "Get API key" flow fills the key. Hidden until
+   the settings screen shows it; never on a manual paste. The theme's $success
+   is the yellow logo color, so use an explicit green here. */
+#aimlapi_key_generated {
+    display: none;
+    color: #3fb950;
+    height: auto;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
 #advanced_section {
     border: round $secondary;
     padding: 1;

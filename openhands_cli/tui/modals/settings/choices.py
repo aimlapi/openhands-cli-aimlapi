@@ -1,6 +1,11 @@
 import litellm
 
 from openhands.sdk.llm import UNVERIFIED_MODELS_EXCLUDING_BEDROCK, VERIFIED_MODELS
+from openhands_cli.aimlapi.models import (
+    AIML_LITELLM_PROVIDER,
+    AIMLAPI_MODELS,
+    AIMLAPI_PROVIDER_LABEL,
+)
 
 
 # Get set of valid litellm provider names for filtering
@@ -35,7 +40,20 @@ def get_provider_options() -> list[tuple[str, str]]:
         all_valid_providers.remove("openhands")
         all_valid_providers.insert(0, "openhands")
 
-    return [(provider, provider) for provider in all_valid_providers]
+    # Present litellm's "aiml" provider under the AIMLAPI brand (the routing
+    # value stays "aiml"; only the displayed label changes to "aimlapi.com").
+    options: list[tuple[str, str]] = []
+    for provider in all_valid_providers:
+        if provider == AIML_LITELLM_PROVIDER:
+            options.append((AIMLAPI_PROVIDER_LABEL, AIML_LITELLM_PROVIDER))
+        else:
+            options.append((provider, provider))
+
+    # Fallback: if the SDK/litellm ever stops listing "aiml", still offer it.
+    if AIML_LITELLM_PROVIDER not in all_valid_providers:
+        options.append((AIMLAPI_PROVIDER_LABEL, AIML_LITELLM_PROVIDER))
+
+    return options
 
 
 def get_model_options(provider: str) -> list[tuple[str, str]]:
@@ -44,6 +62,9 @@ def get_model_options(provider: str) -> list[tuple[str, str]]:
     Models are returned in their original order (VERIFIED first, then UNVERIFIED),
     preserving the original casing. Duplicates are removed while maintaining order.
     """
+    if provider == AIML_LITELLM_PROVIDER:
+        return [(model, model) for model in AIMLAPI_MODELS]
+
     models = VERIFIED_MODELS.get(
         provider, []
     ) + UNVERIFIED_MODELS_EXCLUDING_BEDROCK.get(provider, [])
