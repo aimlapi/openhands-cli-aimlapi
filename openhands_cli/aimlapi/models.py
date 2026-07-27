@@ -20,35 +20,31 @@ AIML_LITELLM_PROVIDER = "aiml"
 # How AIMLAPI is shown in the provider dropdown.
 AIMLAPI_PROVIDER_LABEL = "aimlapi.com"
 
-# Catalog ids WITHOUT the ``aiml/`` prefix (the picker adds the provider prefix
-# when saving). Keep in sync with the web integration's AIMLAPI_MODELS.
+# Catalog ids as returned by AIMLAPI ``GET /v1/models`` (the picker adds the
+# ``aiml/`` provider prefix when saving). Current flagship tool-calling chat
+# models; keep in sync with the SDK's VERIFIED_MODELS["aiml"] list.
 AIMLAPI_MODELS: list[str] = [
-    # OpenAI
-    "openai/gpt-5.2-codex",
-    "openai/gpt-5-codex",
-    "openai/gpt-4.1",
-    "openai/gpt-4.1-mini",
-    "openai/gpt-4o",
-    "openai/gpt-4o-mini",
     # Anthropic
+    "anthropic/claude-opus-5",
     "anthropic/claude-opus-4.8",
-    "anthropic/claude-sonnet-4.6",
-    "anthropic/claude-sonnet-4.5",
-    "anthropic/claude-haiku-4.5",
+    "anthropic/claude-sonnet-5",
+    "anthropic/claude-fable-5",
+    # OpenAI
+    "openai/gpt-5.6-luna-pro",
+    "openai/gpt-5.6-sol-pro",
+    "openai/gpt-5.6-terra-pro",
     # Google
-    "google/gemini-2.5-pro",
-    "google/gemini-2.5-flash",
+    "google/gemini-3.6-flash",
+    # xAI
+    "x-ai/grok-4-5",
     # DeepSeek
     "deepseek/deepseek-v4-pro",
-    "deepseek/deepseek-chat-v3.1",
     # Alibaba Qwen
-    "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    "Qwen/Qwen3-235B-A22B-Thinking-2507",
-    # Meta Llama
-    "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-    # Mistral
-    "mistralai/mistral-large-2512",
-    "mistralai/mistral-medium-3.1",
+    "alibaba/qwen3.7-max",
+    # Zhipu GLM
+    "zhipu/glm-5.2",
     # Moonshot
-    "moonshot/kimi-k2-7-code",
+    "moonshot/kimi-k3",
+    # MiniMax
+    "minimax/minimax-m3",
 ]
