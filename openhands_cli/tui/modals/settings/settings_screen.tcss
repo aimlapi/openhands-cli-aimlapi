@@ -128,19 +128,29 @@ SettingsScreen {
     height: auto;
 }
 
-/* Vertical "or" separator: a short yellow line above and below the word, so
-   it reads as a divider between the key field and the button. Equal side
-   margins keep the field/button gaps symmetric. */
+/* Vertical "or" separator: a yellow rule above and below the word, reading as a
+   divider between the key field and the button. The field and the button are
+   wrapped in ``.api_key_center`` boxes of the SAME height as this stack, so all
+   three centre on one line without any offset (which would clip the top rule).
+   Equal side margins keep the field/button gaps symmetric. */
 #aimlapi_or {
     width: auto;
-    height: 3;
+    height: 5;
     margin: 0 2;
     align: center middle;
 }
 
+.api_key_center {
+    width: 100%;
+    height: 5;
+    /* Push the (height-3) field/button down one row so their vertical centre
+       lands on the divider's "or" row (top rule 2 + word 1 + bottom rule 2). */
+    padding-top: 1;
+}
+
 .aimlapi_or_line {
     width: auto;
-    height: 1;
+    height: 2;
     content-align: center middle;
     color: $primary;
 }

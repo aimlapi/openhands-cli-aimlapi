@@ -130,31 +130,35 @@ class SettingsTab(Container):
                     yield Label("API Key:", classes="form_label")
                     with Horizontal(id="api_key_row"):
                         with Vertical(id="api_key_field_col"):
-                            yield Input(
-                                placeholder="Enter your API key",
-                                password=True,
-                                id="api_key_input",
-                                classes="form_input",
-                                # Disabled until model is selected (Basic) or
-                                # custom model entered (Advanced)
-                                disabled=True,
-                            )
+                            # Centered to the "or" divider's height so the field,
+                            # the word, and the button all line up vertically.
+                            with Vertical(classes="api_key_center"):
+                                yield Input(
+                                    placeholder="Enter your API key",
+                                    password=True,
+                                    id="api_key_input",
+                                    classes="form_input",
+                                    # Disabled until model is selected (Basic) or
+                                    # custom model entered (Advanced)
+                                    disabled=True,
+                                )
                             yield Static(
                                 "Have a key? Paste it here.",
                                 id="api_key_hint",
                                 classes="form_help",
                             )
                         with Vertical(id="aimlapi_or"):
-                            yield Static("│", classes="aimlapi_or_line")
+                            yield Static("││\n││", classes="aimlapi_or_line")
                             yield Static("or", classes="aimlapi_or_word")
-                            yield Static("│", classes="aimlapi_or_line")
+                            yield Static("││\n││", classes="aimlapi_or_line")
                         with Vertical(id="aimlapi_get_key_group"):
-                            yield Button(
-                                "Get API key",
-                                id="aimlapi_get_key_button",
-                                variant="primary",
-                                classes="settings_button",
-                            )
+                            with Vertical(classes="api_key_center"):
+                                yield Button(
+                                    "Get API key",
+                                    id="aimlapi_get_key_button",
+                                    variant="primary",
+                                    classes="settings_button",
+                                )
                             yield Static(
                                 "Continue with aimlapi.com",
                                 classes="form_help",
