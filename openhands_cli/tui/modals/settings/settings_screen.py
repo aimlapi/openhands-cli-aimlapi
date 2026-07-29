@@ -25,7 +25,7 @@ from textual.widgets._select import NoSelection
 
 from openhands.sdk import LLMSummarizingCondenser
 from openhands_cli.aimlapi.device_auth import AimlapiAuthError, authorize
-from openhands_cli.aimlapi.models import AIML_LITELLM_PROVIDER
+from openhands_cli.aimlapi.models import AIML_LITELLM_PROVIDER, refresh_model_cache
 from openhands_cli.stores import AgentStore, CliSettings, CriticSettings
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
@@ -156,9 +156,47 @@ class SettingsScreen(ModalScreen):
     def on_mount(self) -> None:
         """Initialize the form with current settings."""
         self._load_current_settings()
+        self._apply_default_provider()
         self._update_advanced_visibility()
         self._update_field_dependencies()
         self._update_aimlapi_visibility()
+        # Warm the AIMLAPI catalog cache in the background so the model dropdown
+        # reflects the full live chat catalog without blocking the UI.
+        self.run_worker(self._refresh_aimlapi_models(), group="aimlapi_models")
+
+    def _apply_default_provider(self) -> None:
+        """Preselect AIMLAPI as the default provider on first-time setup.
+
+        Only applies when there is no saved agent (fresh install); a returning
+        user's stored provider/model is loaded by ``_load_current_settings``.
+        """
+        if self.current_agent is not None:
+            return
+        try:
+            if self.mode_select.value != "basic":
+                return
+            self.provider_select.value = AIML_LITELLM_PROVIDER
+            self._update_model_options(AIML_LITELLM_PROVIDER)
+        except Exception:
+            pass
+
+    async def _refresh_aimlapi_models(self) -> None:
+        """Refresh the catalog cache, then repopulate options if AIMLAPI is active."""
+        try:
+            models = await refresh_model_cache()
+        except Exception:
+            return
+        if not models:
+            return
+        try:
+            provider = self.provider_select.value
+            if (
+                not isinstance(provider, NoSelection)
+                and str(provider) == AIML_LITELLM_PROVIDER
+            ):
+                self._update_model_options(AIML_LITELLM_PROVIDER)
+        except Exception:
+            pass
 
     def on_show(self) -> None:
         """Reload settings when the screen is shown."""
@@ -167,8 +205,10 @@ class SettingsScreen(ModalScreen):
         if not self.current_agent:
             self._clear_form()
             self._load_current_settings()
+            self._apply_default_provider()
             self._update_advanced_visibility()
             self._update_field_dependencies()
+            self._update_aimlapi_visibility()
 
     def _clear_form(self) -> None:
         """Clear all form values before reloading."""
@@ -333,7 +373,7 @@ class SettingsScreen(ModalScreen):
             # The button, the "or" separator, and the paste hint only make
             # sense for AIMLAPI; hiding them lets the key field span the row.
             self.aimlapi_get_key_group.display = bool(is_aimlapi)
-            self.query_one("#aimlapi_or", Static).display = bool(is_aimlapi)
+            self.query_one("#aimlapi_or").display = bool(is_aimlapi)
             self.query_one("#api_key_hint", Static).display = bool(is_aimlapi)
             # Leaving AIMLAPI clears the green "key generated" confirmation.
             if not is_aimlapi:

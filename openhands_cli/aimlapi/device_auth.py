@@ -28,6 +28,11 @@ from openhands_cli.aimlapi.config import (
 
 DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 HTTP_TIMEOUT_SECONDS = 15.0
+# Transient poll failures (network blips, 5xx, gateway timeouts) must not abort a
+# flow that may legitimately span many minutes while the user registers and pays
+# in the browser. Keep polling across up to this many *consecutive* failures
+# before giving up; a single hiccup no longer kills the whole authorization.
+MAX_CONSECUTIVE_POLL_ERRORS = 6
 # Terminal, non-recoverable outcomes reported by the token endpoint.
 TERMINAL_FAILURE_STATUSES = {
     "cancelled",
@@ -229,8 +234,22 @@ async def authorize(
         pass
     notify("Approve access in your browser to receive a key...")
 
+    # Transient poll failures (network blips, 5xx) must not abort a flow that may
+    # span many minutes while the user registers and pays in the browser; keep
+    # polling across a few consecutive failures. Expiry is reported by
+    # ``poll_authorization`` as a terminal "expired" status.
+    consecutive_errors = 0
     while True:
-        result = await poll_authorization(authorization)
+        try:
+            result = await poll_authorization(authorization)
+        except AimlapiAuthError:
+            consecutive_errors += 1
+            if consecutive_errors >= MAX_CONSECUTIVE_POLL_ERRORS:
+                raise
+            await asyncio.sleep(authorization.interval)
+            continue
+        consecutive_errors = 0
+
         if result.status == "ready":
             notify("API key received.")
             return result.api_key
