@@ -148,9 +148,9 @@ class SettingsTab(Container):
                                 classes="form_help",
                             )
                         with Vertical(id="aimlapi_or"):
-                            yield Static("││\n││", classes="aimlapi_or_line")
+                            yield Static("│\n│", classes="aimlapi_or_line")
                             yield Static("or", classes="aimlapi_or_word")
-                            yield Static("││\n││", classes="aimlapi_or_line")
+                            yield Static("│\n│", classes="aimlapi_or_line")
                         with Vertical(id="aimlapi_get_key_group"):
                             with Vertical(classes="api_key_center"):
                                 yield Button(
