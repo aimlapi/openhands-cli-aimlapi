@@ -56,20 +56,45 @@ def test_available_models_falls_back_when_no_cache(monkeypatch):
     assert aimlapi_models.available_models() == list(aimlapi_models.AIMLAPI_MODELS)
 
 
-def test_parse_chat_ids_filters_and_dedupes():
+def test_parse_chat_ids_filters_dedupes_and_pins_hottest():
     payload = {
         "data": [
+            # Hottest, but last alphabetically -> must still come first.
+            {
+                "id": "zzz/flagship",
+                "type": "openai/chat-completions",
+                "info": {"isHottest": True},
+            },
             {"id": "openai/gpt-4o", "type": "openai/chat-completions"},
             # Same id, non-chat endpoint -> ignored (dedupe across endpoints).
             {"id": "openai/gpt-4o", "type": "openai/responses/submit"},
+            # Not a chat model -> filtered out.
             {"id": "openai/dall-e-3", "type": "openai/image-generations"},
-            {"id": "x-ai/grok-4-5", "type": "openai/chat-completions"},
+            {"id": "aaa/basic", "type": "openai/chat-completions"},
         ]
     }
+    # Hottest pinned first; the remainder alphabetical (case-insensitive).
     assert aimlapi_models._parse_chat_ids(payload) == [
+        "zzz/flagship",
+        "aaa/basic",
         "openai/gpt-4o",
-        "x-ai/grok-4-5",
     ]
+
+
+def test_parse_chat_ids_hotness_is_ored_across_endpoints():
+    # An id flagged hottest on ANY of its chat entries counts as hottest.
+    payload = {
+        "data": [
+            {"id": "vendor/m", "type": "openai/chat-completions"},
+            {
+                "id": "vendor/m",
+                "type": "openai/chat-completions",
+                "info": {"isHottest": True},
+            },
+            {"id": "aaa/plain", "type": "openai/chat-completions"},
+        ]
+    }
+    assert aimlapi_models._parse_chat_ids(payload) == ["vendor/m", "aaa/plain"]
 
 
 def test_other_provider_does_not_get_aiml_models():

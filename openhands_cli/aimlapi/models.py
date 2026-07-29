@@ -9,9 +9,10 @@ for it.
 
 The model list is fetched live from ``GET /v1/models`` (public, no key needed)
 and filtered to chat-completions models, so the picker always reflects the full
-current AIMLAPI chat catalog. ``AIMLAPI_MODELS`` below is the built-in fallback
-used only when the catalog cannot be fetched (offline / first run before the
-cache warms).
+current AIMLAPI chat catalog. The "hottest" models (flagged ``info.isHottest``
+by the API) are ordered first, the rest alphabetically. ``AIMLAPI_MODELS`` below
+is the built-in fallback used only when the catalog cannot be fetched (offline /
+first run before the cache warms).
 """
 
 import json
@@ -43,9 +44,11 @@ def aimlapi_provider_prompt() -> Text:
     return prompt
 
 
-# Built-in fallback list — flagship tool-calling chat ids, used only when the
-# live catalog is unavailable. Catalog ids as returned by ``GET /v1/models``
-# (the picker adds the ``aiml/`` provider prefix when saving).
+# Offline fallback list — flagship "hottest" chat ids, used only when the live
+# catalog can't be fetched. When the catalog IS available, the hottest models are
+# instead detected from the ``info.isHottest`` flag (see ``_parse_chat_ids``).
+# Catalog ids as returned by ``GET /v1/models`` (the picker adds the ``aiml/``
+# provider prefix when saving).
 AIMLAPI_MODELS: list[str] = [
     # Anthropic
     "anthropic/claude-opus-5",
@@ -96,22 +99,30 @@ def _models_url() -> str:
 
 
 def _parse_chat_ids(payload: object) -> list[str]:
-    """Extract sorted, de-duplicated chat-model ids from a /v1/models payload."""
+    """Ordered, de-duplicated chat-model ids from a /v1/models payload.
+
+    "Hottest" models (``info.isHottest == true`` on any of the model's
+    chat-completions entries) are returned first, then the rest; each group is
+    sorted alphabetically by id (case-insensitive).
+    """
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list):
         return []
-    seen: set[str] = set()
-    ids: list[str] = []
+    # id -> isHottest, OR-ed across the model's chat entries.
+    hot_by_id: dict[str, bool] = {}
     for entry in data:
         if not isinstance(entry, dict):
             continue
         if not str(entry.get("type", "")).endswith(_CHAT_TYPE_SUFFIX):
             continue
         model_id = str(entry.get("id", "")).strip()
-        if model_id and model_id not in seen:
-            seen.add(model_id)
-            ids.append(model_id)
-    return sorted(ids)
+        if not model_id:
+            continue
+        info = entry.get("info")
+        is_hot = bool(info.get("isHottest")) if isinstance(info, dict) else False
+        hot_by_id[model_id] = hot_by_id.get(model_id, False) or is_hot
+    # Hottest first (False sorts before True → negate), then case-insensitive id.
+    return sorted(hot_by_id, key=lambda mid: (not hot_by_id[mid], mid.lower()))
 
 
 def _read_cache() -> list[str] | None:
