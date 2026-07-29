@@ -56,10 +56,14 @@ async def app(_store: _InMemoryStore):
         yield application, pilot
 
 
-async def test_aimlapi_controls_hidden_by_default(app):
-    application, _pilot = app
+async def test_aimlapi_is_default_provider_on_first_run(app):
+    # No saved agent (first-time setup) -> AIMLAPI is preselected, so its
+    # "Get API key" controls are visible without the user picking a provider.
+    application, pilot = app
     screen = application.settings_screen
-    assert screen.aimlapi_get_key_group.display is False
+    await pilot.pause()
+    assert str(screen.provider_select.value) == "aiml"
+    assert screen.aimlapi_get_key_group.display is True
 
 
 async def test_aimlapi_controls_shown_for_aiml_provider(app):
@@ -70,7 +74,7 @@ async def test_aimlapi_controls_shown_for_aiml_provider(app):
     screen._update_aimlapi_visibility()
     await pilot.pause()
     assert screen.aimlapi_get_key_group.display is True
-    assert screen.query_one("#aimlapi_or", Static).display is True
+    assert screen.query_one("#aimlapi_or").display is True
     assert screen.query_one("#api_key_hint", Static).display is True
 
 

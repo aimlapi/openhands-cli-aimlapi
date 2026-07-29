@@ -149,3 +149,52 @@ async def test_authorize_raises_on_terminal_status():
     ):
         with pytest.raises(AimlapiAuthError, match="denied"):
             await authorize(open_browser=lambda _url: None)
+
+
+async def test_authorize_tolerates_transient_poll_errors():
+    # A long sign-up/payment detour can hit momentary network/server blips; the
+    # flow must keep polling and still succeed once the key is issued.
+    auth = _auth_request()
+    poll = AsyncMock(
+        side_effect=[
+            AimlapiAuthError("temporary network blip"),
+            AuthorizationPollResult(status="pending"),
+            AimlapiAuthError("temporary 502"),
+            AuthorizationPollResult(status="ready", api_key="k"),
+        ]
+    )
+    with (
+        patch.object(device_auth, "start_authorization", AsyncMock(return_value=auth)),
+        patch.object(device_auth, "poll_authorization", poll),
+        patch.object(device_auth.asyncio, "sleep", AsyncMock()),
+    ):
+        key = await authorize(open_browser=lambda _url: None)
+    assert key == "k"
+
+
+async def test_authorize_gives_up_after_repeated_errors():
+    auth = _auth_request()
+    poll = AsyncMock(side_effect=AimlapiAuthError("still broken"))
+    with (
+        patch.object(device_auth, "start_authorization", AsyncMock(return_value=auth)),
+        patch.object(device_auth, "poll_authorization", poll),
+        patch.object(device_auth.asyncio, "sleep", AsyncMock()),
+    ):
+        with pytest.raises(AimlapiAuthError, match="still broken"):
+            await authorize(open_browser=lambda _url: None)
+    assert poll.await_count == device_auth.MAX_CONSECUTIVE_POLL_ERRORS
+
+
+async def test_authorize_raises_on_expired_status():
+    auth = _auth_request()
+    with (
+        patch.object(device_auth, "start_authorization", AsyncMock(return_value=auth)),
+        patch.object(
+            device_auth,
+            "poll_authorization",
+            AsyncMock(return_value=AuthorizationPollResult(status="expired")),
+        ),
+        patch.object(device_auth.asyncio, "sleep", AsyncMock()),
+    ):
+        with pytest.raises(AimlapiAuthError, match="expired"):
+            await authorize(open_browser=lambda _url: None)

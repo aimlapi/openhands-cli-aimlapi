@@ -144,7 +144,10 @@ class SettingsTab(Container):
                                 id="api_key_hint",
                                 classes="form_help",
                             )
-                        yield Static("or", id="aimlapi_or")
+                        with Vertical(id="aimlapi_or"):
+                            yield Static("│", classes="aimlapi_or_line")
+                            yield Static("or", classes="aimlapi_or_word")
+                            yield Static("│", classes="aimlapi_or_line")
                         with Vertical(id="aimlapi_get_key_group"):
                             yield Button(
                                 "Get API key",
@@ -153,7 +156,7 @@ class SettingsTab(Container):
                                 classes="settings_button",
                             )
                             yield Static(
-                                "Sign in or create an aimlapi.com account.",
+                                "Continue with aimlapi.com",
                                 classes="form_help",
                             )
                     # Green confirmation shown after the OAuth "Get API key"

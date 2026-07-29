@@ -128,10 +128,26 @@ SettingsScreen {
     height: auto;
 }
 
+/* Vertical "or" separator: a short yellow line above and below the word, so
+   it reads as a divider between the key field and the button. Equal side
+   margins keep the field/button gaps symmetric. */
 #aimlapi_or {
     width: auto;
     height: 3;
-    padding: 0 2;
+    margin: 0 2;
+    align: center middle;
+}
+
+.aimlapi_or_line {
+    width: auto;
+    height: 1;
+    content-align: center middle;
+    color: $primary;
+}
+
+.aimlapi_or_word {
+    width: auto;
+    height: 1;
     content-align: center middle;
     color: $secondary;
     text-style: italic bold;

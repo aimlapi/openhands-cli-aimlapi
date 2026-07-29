@@ -1,10 +1,11 @@
 import litellm
+from rich.console import RenderableType
 
 from openhands.sdk.llm import UNVERIFIED_MODELS_EXCLUDING_BEDROCK, VERIFIED_MODELS
 from openhands_cli.aimlapi.models import (
     AIML_LITELLM_PROVIDER,
-    AIMLAPI_MODELS,
-    AIMLAPI_PROVIDER_LABEL,
+    aimlapi_provider_prompt,
+    available_models,
 )
 
 
@@ -15,7 +16,7 @@ _VALID_LITELLM_PROVIDERS: set[str] = {
 }
 
 
-def get_provider_options() -> list[tuple[str, str]]:
+def get_provider_options() -> list[tuple[RenderableType, str]]:
     """Get list of available LLM providers.
 
     Includes:
@@ -42,16 +43,23 @@ def get_provider_options() -> list[tuple[str, str]]:
 
     # Present litellm's "aiml" provider under the AIMLAPI brand (the routing
     # value stays "aiml"; only the displayed label changes to "aimlapi.com").
-    options: list[tuple[str, str]] = []
+    options: list[tuple[RenderableType, str]] = []
     for provider in all_valid_providers:
         if provider == AIML_LITELLM_PROVIDER:
-            options.append((AIMLAPI_PROVIDER_LABEL, AIML_LITELLM_PROVIDER))
+            options.append((aimlapi_provider_prompt(), AIML_LITELLM_PROVIDER))
         else:
             options.append((provider, provider))
 
     # Fallback: if the SDK/litellm ever stops listing "aiml", still offer it.
     if AIML_LITELLM_PROVIDER not in all_valid_providers:
-        options.append((AIMLAPI_PROVIDER_LABEL, AIML_LITELLM_PROVIDER))
+        options.append((aimlapi_provider_prompt(), AIML_LITELLM_PROVIDER))
+
+    # Pin AIMLAPI to the very top of the provider list (before 'openhands').
+    # Keyed on the routing value since the label is a styled renderable.
+    for index, (_label, value) in enumerate(options):
+        if value == AIML_LITELLM_PROVIDER:
+            options.insert(0, options.pop(index))
+            break
 
     return options
 
@@ -63,7 +71,7 @@ def get_model_options(provider: str) -> list[tuple[str, str]]:
     preserving the original casing. Duplicates are removed while maintaining order.
     """
     if provider == AIML_LITELLM_PROVIDER:
-        return [(model, model) for model in AIMLAPI_MODELS]
+        return [(model, model) for model in available_models()]
 
     models = VERIFIED_MODELS.get(
         provider, []
