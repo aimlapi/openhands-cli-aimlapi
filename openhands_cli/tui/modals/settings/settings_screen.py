@@ -24,6 +24,8 @@ from textual.widgets import (
 from textual.widgets._select import NoSelection
 
 from openhands.sdk import LLMSummarizingCondenser
+from openhands_cli.aimlapi.device_auth import AimlapiAuthError, authorize
+from openhands_cli.aimlapi.models import AIML_LITELLM_PROVIDER, refresh_model_cache
 from openhands_cli.stores import AgentStore, CliSettings, CriticSettings
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
@@ -67,6 +69,9 @@ class SettingsScreen(ModalScreen):
     basic_section: getters.query_one[Container] = getters.query_one("#basic_section")
     advanced_section: getters.query_one[Container] = getters.query_one(
         "#advanced_section"
+    )
+    aimlapi_get_key_group: getters.query_one[Container] = getters.query_one(
+        "#aimlapi_get_key_group"
     )
 
     def __init__(
@@ -151,8 +156,47 @@ class SettingsScreen(ModalScreen):
     def on_mount(self) -> None:
         """Initialize the form with current settings."""
         self._load_current_settings()
+        self._apply_default_provider()
         self._update_advanced_visibility()
         self._update_field_dependencies()
+        self._update_aimlapi_visibility()
+        # Warm the AIMLAPI catalog cache in the background so the model dropdown
+        # reflects the full live chat catalog without blocking the UI.
+        self.run_worker(self._refresh_aimlapi_models(), group="aimlapi_models")
+
+    def _apply_default_provider(self) -> None:
+        """Preselect AIMLAPI as the default provider on first-time setup.
+
+        Only applies when there is no saved agent (fresh install); a returning
+        user's stored provider/model is loaded by ``_load_current_settings``.
+        """
+        if self.current_agent is not None:
+            return
+        try:
+            if self.mode_select.value != "basic":
+                return
+            self.provider_select.value = AIML_LITELLM_PROVIDER
+            self._update_model_options(AIML_LITELLM_PROVIDER)
+        except Exception:
+            pass
+
+    async def _refresh_aimlapi_models(self) -> None:
+        """Refresh the catalog cache, then repopulate options if AIMLAPI is active."""
+        try:
+            models = await refresh_model_cache()
+        except Exception:
+            return
+        if not models:
+            return
+        try:
+            provider = self.provider_select.value
+            if (
+                not isinstance(provider, NoSelection)
+                and str(provider) == AIML_LITELLM_PROVIDER
+            ):
+                self._update_model_options(AIML_LITELLM_PROVIDER)
+        except Exception:
+            pass
 
     def on_show(self) -> None:
         """Reload settings when the screen is shown."""
@@ -161,8 +205,10 @@ class SettingsScreen(ModalScreen):
         if not self.current_agent:
             self._clear_form()
             self._load_current_settings()
+            self._apply_default_provider()
             self._update_advanced_visibility()
             self._update_field_dependencies()
+            self._update_aimlapi_visibility()
 
     def _clear_form(self) -> None:
         """Clear all form values before reloading."""
@@ -247,6 +293,7 @@ class SettingsScreen(ModalScreen):
 
         # Update field dependencies after loading all values
         self._update_field_dependencies()
+        self._update_aimlapi_visibility()
 
     def _get_selected_model_identity(self) -> tuple[str | None, str | None]:
         """Return the currently selected model/base_url identity from the form."""
@@ -312,6 +359,27 @@ class SettingsScreen(ModalScreen):
         else:
             self.basic_section.display = True
             self.advanced_section.display = False
+
+    def _update_aimlapi_visibility(self) -> None:
+        """Show the AIMLAPI "Get API key" controls only for the aiml provider."""
+        try:
+            is_basic = self.mode_select.value == "basic"
+            provider = self.provider_select.value
+            is_aimlapi = (
+                is_basic
+                and not isinstance(provider, NoSelection)
+                and str(provider) == AIML_LITELLM_PROVIDER
+            )
+            # The button, the "or" separator, and the paste hint only make
+            # sense for AIMLAPI; hiding them lets the key field span the row.
+            self.aimlapi_get_key_group.display = bool(is_aimlapi)
+            self.query_one("#aimlapi_or").display = bool(is_aimlapi)
+            self.query_one("#api_key_hint", Static).display = bool(is_aimlapi)
+            # Leaving AIMLAPI clears the green "key generated" confirmation.
+            if not is_aimlapi:
+                self.query_one("#aimlapi_key_generated", Static).display = False
+        except Exception:
+            pass
 
     def _has_existing_api_key(self) -> bool:
         """Check if there's an existing API key in the agent."""
@@ -428,11 +496,13 @@ class SettingsScreen(ModalScreen):
             self._update_advanced_visibility()
             self._reset_max_tokens_if_model_changed()
             self._update_field_dependencies()
+            self._update_aimlapi_visibility()
             self._clear_message()
         elif event.select.id == "provider_select":
             if event.value is not NoSelection:
                 self._update_model_options(str(event.value))
             self._update_field_dependencies()
+            self._update_aimlapi_visibility()
             self._clear_message()
         elif event.select.id == "model_select":
             self._reset_max_tokens_if_model_changed()
@@ -455,6 +525,44 @@ class SettingsScreen(ModalScreen):
             self._save_settings()
         elif event.button.id == "cancel_button":
             self._handle_cancel()
+        elif event.button.id == "aimlapi_get_key_button":
+            self._start_aimlapi_authorization()
+
+    def _start_aimlapi_authorization(self) -> None:
+        """Launch the AIMLAPI "Get API key" device flow in a worker."""
+        try:
+            button = self.query_one("#aimlapi_get_key_button", Button)
+        except Exception:
+            return
+        button.disabled = True
+        self._clear_message()
+        try:
+            self.query_one("#aimlapi_key_generated", Static).display = False
+        except Exception:
+            pass
+        self.run_worker(
+            self._aimlapi_authorization_worker(button),
+            exclusive=True,
+            group="aimlapi_auth",
+        )
+
+    async def _aimlapi_authorization_worker(self, button: Button) -> None:
+        """Run the AIMLAPI device flow and fill the key on success."""
+        try:
+            key = await authorize(on_status=lambda msg: self._show_message(msg))
+            self.api_key_input.value = key
+            self._update_field_dependencies()
+            # Green confirmation under the key row (OAuth path only).
+            self.query_one("#aimlapi_key_generated", Static).display = True
+            self._clear_message()
+        except AimlapiAuthError as exc:
+            self._show_message(str(exc), is_error=True)
+        except Exception:
+            self._show_message(
+                "AIMLAPI authorization failed. Please try again.", is_error=True
+            )
+        finally:
+            button.disabled = False
 
     def action_cancel(self) -> None:
         """Handle escape key to cancel settings."""

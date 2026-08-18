@@ -1,8 +1,8 @@
 """Settings tab component for the settings modal."""
 
 from textual.app import ComposeResult
-from textual.containers import Container, VerticalScroll
-from textual.widgets import Input, Label, Select, Static
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.widgets import Button, Input, Label, Select, Static
 
 from openhands_cli.tui.modals.settings.choices import (
     provider_options,
@@ -122,17 +122,53 @@ class SettingsTab(Container):
                             disabled=True,
                         )
 
-                # API Key (shown in both modes)
+                # API Key (shown in both modes). For AIMLAPI the key field sits
+                # on one row next to a "Get API key" button; the "or" separator,
+                # the button, and the paste hint are shown only when the AIMLAPI
+                # provider is selected (managed by the settings screen).
                 with Container(classes="form_group"):
                     yield Label("API Key:", classes="form_label")
-                    yield Input(
-                        placeholder="Enter your API key",
-                        password=True,
-                        id="api_key_input",
-                        classes="form_input",
-                        # Disabled until model is selected (Basic) or
-                        # custom model entered (Advanced)
-                        disabled=True,
+                    with Horizontal(id="api_key_row"):
+                        with Vertical(id="api_key_field_col"):
+                            # Centered to the "or" divider's height so the field,
+                            # the word, and the button all line up vertically.
+                            with Vertical(classes="api_key_center"):
+                                yield Input(
+                                    placeholder="Enter your API key",
+                                    password=True,
+                                    id="api_key_input",
+                                    classes="form_input",
+                                    # Disabled until model is selected (Basic) or
+                                    # custom model entered (Advanced)
+                                    disabled=True,
+                                )
+                            yield Static(
+                                "Have a key? Paste it here.",
+                                id="api_key_hint",
+                                classes="form_help",
+                            )
+                        with Vertical(id="aimlapi_or"):
+                            yield Static("│\n│", classes="aimlapi_or_line")
+                            yield Static("or", classes="aimlapi_or_word")
+                            yield Static("│\n│", classes="aimlapi_or_line")
+                        with Vertical(id="aimlapi_get_key_group"):
+                            with Vertical(classes="api_key_center"):
+                                yield Button(
+                                    "Get API key",
+                                    id="aimlapi_get_key_button",
+                                    variant="primary",
+                                    classes="settings_button",
+                                )
+                            yield Static(
+                                "Continue with aimlapi.com",
+                                classes="form_help",
+                            )
+                    # Green confirmation shown after the OAuth "Get API key"
+                    # flow fills the key above (toggled by the settings screen).
+                    yield Static(
+                        "Your aimlapi.com key has already been generated and "
+                        "added above.",
+                        id="aimlapi_key_generated",
                     )
 
                 # Memory Condensation
